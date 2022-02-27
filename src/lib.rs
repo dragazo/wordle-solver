@@ -222,7 +222,7 @@ impl fmt::Display for Puzzle {
             writeln!(f, "{}: {}", i, txt)?;
         }
 
-        write!(f, "{{").unwrap();
+        write!(f, "{{ ").unwrap();
         for (counts, letter) in iter::zip(&self.letter_counts, letters.chars()) {
             write!(f, "{}: {}..={}, ", letter, counts.0, counts.1).unwrap();
         }
