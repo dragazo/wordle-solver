@@ -20,11 +20,11 @@ const WORD_LEN: usize = 5;
 fn main() {
     let mut puzzle = Puzzle::new(WORD_LEN);
 
-    puzzle.guess("cares", &[Hint::Absent, Hint::Absent, Hint::Present, Hint::Present, Hint::Absent]).unwrap();
-    puzzle.guess("bonie", &[Hint::Absent, Hint::Absent, Hint::Absent, Hint::Present, Hint::Correct]).unwrap();
-    puzzle.guess("elite", &[Hint::Absent, Hint::Absent, Hint::Correct, Hint::Absent, Hint::Correct]).unwrap();
-    puzzle.guess("gride", &[Hint::Correct, Hint::Correct, Hint::Correct, Hint::Absent, Hint::Correct]).unwrap();
-    // should guess kempt
+    puzzle.guess("cares", &[Hint::Absent, Hint::Correct, Hint::Absent, Hint::Present, Hint::Present]).unwrap();
+    puzzle.guess("satay", &[Hint::Present, Hint::Correct, Hint::Absent, Hint::Absent, Hint::Absent]).unwrap();
+    puzzle.guess("bonie", &[Hint::Absent, Hint::Absent, Hint::Absent, Hint::Absent, Hint::Correct]).unwrap();
+    puzzle.guess("douse", &[Hint::Absent, Hint::Absent, Hint::Correct, Hint::Correct, Hint::Correct]).unwrap();
+    puzzle.guess("hause", &[Hint::Absent, Hint::Correct, Hint::Correct, Hint::Correct, Hint::Correct]).unwrap();
 
 
 
