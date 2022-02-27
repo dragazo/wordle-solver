@@ -15,7 +15,6 @@ path = "src/main.rs"
 
 [dependencies]
 lazy_static = "1.4.0"
-bit-set = "0.5.2"
 itertools = "0.10.3"
 float-ord = "0.3.2"
 num_cpus = "1.13.1"

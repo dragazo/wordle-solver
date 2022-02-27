@@ -3,9 +3,11 @@ use std::{iter, fmt};
 use std::sync::{Arc, Mutex};
 use std::ops::Deref;
 
-use bit_set::BitSet;
 use itertools::Itertools;
 use float_ord::FloatOrd;
+
+mod bit_set;
+use bit_set::UsizeBitSet;
 
 #[macro_use] extern crate lazy_static;
 
@@ -45,12 +47,12 @@ pub enum Hint { Correct, Present, Absent }
 
 #[derive(Debug, Clone)]
 pub struct Puzzle {
-    slots: Vec<BitSet<u32>>,
+    slots: Vec<UsizeBitSet>,
     letter_counts: [(usize, usize); 26],
 }
 impl Puzzle {
     pub fn new(length: usize) -> Self {
-        let mut allowed = BitSet::new();
+        let mut allowed = UsizeBitSet::new();
         for i in 0..26 { allowed.insert(i); }
         let mut res = Puzzle {
             slots: vec![allowed; length],
@@ -73,11 +75,14 @@ impl Puzzle {
         true
     }
     fn reduce(&mut self) {
+        let mut masks = vec![UsizeBitSet::new(); self.slots.len()];
+        let mut slot_idxs = Vec::with_capacity(self.slots.len());
+
         loop {
             let mut did_something = false;
 
             // do slot-wise letter elimination by intersect with union over valid words
-            let mut masks = vec![BitSet::new(); self.slots.len()];
+            for mask in masks.iter_mut() { mask.clear(); }
             for &word in WORD_LIST.get(&self.slots.len()).map(|x| x.as_slice()).unwrap_or(&[]) {
                 if !self.could_be(word) { continue }
                 for (mask, &ch) in iter::zip(&mut masks, word.as_bytes()) {
@@ -92,7 +97,6 @@ impl Puzzle {
             }
 
             // do occurrence-based eliminations for slots with known occurrences
-            let mut slot_idxs = Vec::with_capacity(self.slots.len());
             for (letter, &(min, _)) in self.letter_counts.iter().enumerate() {
                 slot_idxs.clear();
                 slot_idxs.extend(self.slots.iter().enumerate().filter_map(|(i, slot)| if slot.contains(letter) { Some(i) } else { None }));
@@ -100,7 +104,7 @@ impl Puzzle {
 
                 for &idx in slot_idxs.iter() {
                     let slot = &mut self.slots[idx];
-                    if slot.len() > 1 {
+                    if (*slot).into_iter().nth(1).is_some() { // len > 1
                         slot.clear();
                         slot.insert(letter);
                         did_something = true;
@@ -157,7 +161,7 @@ impl Puzzle {
         Ok(self.guess_impl(word, response))
     }
     pub fn best_guess(&self, mut threads: usize) -> Result<(&'static str, usize, f64), SolveErr> {
-        if self.slots.iter().any(BitSet::is_empty) { return Err(SolveErr::Inconsistent); }
+        if self.slots.iter().any(UsizeBitSet::is_empty) { return Err(SolveErr::Inconsistent); }
         threads = threads.max(1);
 
         let word_pool = WORD_LIST.get(&self.slots.len()).map(|x| x.as_slice()).unwrap_or(&[]);
@@ -215,7 +219,7 @@ impl fmt::Display for Puzzle {
         let letters = "abcdefghijklmnopqrstuvwxyz";
         let mut mapped = BTreeSet::new();
 
-        for (i, slot) in self.slots.iter().enumerate() {
+        for (i, &slot) in self.slots.iter().enumerate() {
             mapped.clear();
             for v in slot { mapped.insert(&letters[v..v+1]); }
             let txt = mapped.iter().fold(String::new(), |acc, v| acc + v);
