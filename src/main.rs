@@ -20,21 +20,16 @@ const WORD_LEN: usize = 5;
 fn main() {
     let mut puzzle = Puzzle::new(WORD_LEN);
 
-    // puzzle.guess("cares", &[Hint::Absent, Hint::Absent, Hint::Present, Hint::Present, Hint::Absent]).unwrap();
-    // puzzle.guess("bonie", &[Hint::Absent, Hint::Absent, Hint::Absent, Hint::Present, Hint::Correct]).unwrap();
-    // puzzle.guess("elite", &[Hint::Absent, Hint::Absent, Hint::Correct, Hint::Absent, Hint::Correct]).unwrap();
-    // puzzle.guess("gride", &[Hint::Correct, Hint::Correct, Hint::Correct, Hint::Absent, Hint::Correct]).unwrap();
+    puzzle.guess("cares", &[Hint::Absent, Hint::Absent, Hint::Present, Hint::Present, Hint::Absent]).unwrap();
+    puzzle.guess("bonie", &[Hint::Absent, Hint::Absent, Hint::Absent, Hint::Present, Hint::Correct]).unwrap();
+    puzzle.guess("elite", &[Hint::Absent, Hint::Absent, Hint::Correct, Hint::Absent, Hint::Correct]).unwrap();
+    puzzle.guess("gride", &[Hint::Correct, Hint::Correct, Hint::Correct, Hint::Absent, Hint::Correct]).unwrap();
     // should guess kempt
 
-
-    puzzle.guess("cares", &[Hint::Correct, Hint::Absent, Hint::Absent, Hint::Absent, Hint::Absent]).unwrap();
-    puzzle.guess("yoick", &[Hint::Present, Hint::Absent, Hint::Present, Hint::Present, Hint::Absent]).unwrap();
-    puzzle.guess("tulip", &[Hint::Absent, Hint::Absent, Hint::Absent, Hint::Correct, Hint::Absent]).unwrap();
-    puzzle.guess("civic", &[Hint::Correct, Hint::Absent, Hint::Absent, Hint::Correct, Hint::Correct]).unwrap();
 
 
 
     println!("{}", puzzle);
-    let (best_guess, words_remaining) = puzzle.best_guess(8).unwrap();
-    println!("best guess: {} (words remaining: {})", best_guess, words_remaining);
+    let (best_guess, worst_rem, avg_rem) = puzzle.best_guess(8).unwrap();
+    println!("best guess: {} (worst rem: {}, avg rem: {})", best_guess, worst_rem, avg_rem);
 }

@@ -5,6 +5,7 @@ use std::ops::Deref;
 
 use bit_set::BitSet;
 use itertools::Itertools;
+use float_ord::FloatOrd;
 
 #[macro_use] extern crate lazy_static;
 
@@ -128,60 +129,56 @@ impl Puzzle {
         if word.len() != response.len() { return Err(GuessErr::InvalidInput); }
         Ok(self.guess_impl(word, response))
     }
-    pub fn best_guess(&self, mut threads: usize) -> Result<(&'static str, usize), SolveErr> {
+    pub fn best_guess(&self, mut threads: usize) -> Result<(&'static str, usize, f64), SolveErr> {
         if self.slots.iter().any(BitSet::is_empty) { return Err(SolveErr::Inconsistent); }
         threads = threads.max(1);
 
         let word_pool = WORD_LIST.get(&self.slots.len()).map(|x| x.as_slice()).unwrap_or(&[]);
-
-        // all the guessing words that could yield SOME amount of information 
-        // let feasible_pool = Arc::new(word_pool.iter().copied().filter(|&guess| {
-        //     let total_mask: BitSet = guess.as_bytes().iter().map(|&x| x as usize - 97).collect();
-        //     self.slots.iter().any(|slot| !slot.is_disjoint(&total_mask))
-        //     // true
-        // }).collect::<Vec<_>>());
-        // println!("pool size: {}", feasible_pool.len());
-        // let guesses = Arc::new(Mutex::new(feasible_pool.deref().clone().into_iter().fuse()));
-
 
         let guesses = Arc::new(Mutex::new(word_pool.iter().copied().fuse()));
         let threads: Vec<_> = (0..threads).map(|_| {
             let guesses = guesses.clone();
             let this = self.clone();
             std::thread::spawn(move || {
-                let mut best: Option<(CheckedStr, usize, bool)> = None; // (guess, remaining words, could be answer flag)
+                let mut best: Option<(CheckedStr, (usize, FloatOrd<f64>), bool)> = None; // (guess, (worst case remaining, avg case remaining), could be answer flag)
                 'next_word: loop {
                     let guess = match guesses.lock().unwrap().next() {
                         Some(x) => x,
                         None => break,
                     };
 
-                    let mut worst = 0;
+                    let mut worst: usize = 0;
+                    let mut worst_avg: (usize, usize) = (0, 1);
                     for response in iter::once([Hint::Absent, Hint::Present, Hint::Correct]).cycle().take(this.slots.len()).multi_cartesian_product() {
                         let mut cpy = this.clone();
                         cpy.guess_impl(guess, &response);
                         let possible = word_pool.iter().filter(|&&s| cpy.could_be(s)).count();
+                        if possible == 0 { continue }
+
                         worst = worst.max(possible);
+                        worst_avg.0 += possible;
+                        worst_avg.1 += 1;
 
                         if let Some(prev) = best {
-                            if worst > prev.1 { continue 'next_word; }
+                            if worst > prev.1.0 { continue 'next_word; }
                         }
                     }
-                    if worst == 0 { continue }
+                    if worst == 0 { continue 'next_word; }
 
+                    let score = (worst, FloatOrd(worst_avg.0 as f64 / worst_avg.1 as f64));
                     let replace = match best {
                         None => true,
-                        Some(prev) => worst < prev.1 || (worst == prev.1 && !prev.2),
+                        Some(prev) => score < prev.1 || (score == prev.1 && !prev.2),
                     };
-                    if replace { best = Some((guess, worst, this.could_be(guess))); }
+                    if replace { best = Some((guess, score, this.could_be(guess))); }
                 }
                 best
             })
         }).collect();
 
-        let best = threads.into_iter().filter_map(|t| t.join().unwrap()).min_by_key(|&(guess, val, cbf)| (val, if cbf { 0 } else { 1 }, guess));
+        let best = threads.into_iter().filter_map(|t| t.join().unwrap()).min_by_key(|&(guess, score, cbf)| (score, if cbf { 0 } else { 1 }, guess));
         match best {
-            Some(x) => Ok((x.0.0, x.1)),
+            Some(x) => Ok((x.0.0, x.1.0, x.1.1.0)),
             None => Err(SolveErr::Inconsistent),
         }
     }
