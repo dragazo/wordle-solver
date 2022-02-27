@@ -73,30 +73,42 @@ impl Puzzle {
         true
     }
     fn reduce(&mut self) {
-        // do slot-wise letter elimination by intersect with union over valid words
-        let mut masks = vec![BitSet::new(); self.slots.len()];
-        for &word in WORD_LIST.get(&self.slots.len()).map(|x| x.as_slice()).unwrap_or(&[]) {
-            if !self.could_be(word) { continue }
-            for (mask, &ch) in iter::zip(&mut masks, word.as_bytes()) {
-                mask.insert(ch as usize - 97);
-            }
-        }
-        for (slot, mask) in iter::zip(&mut self.slots, &masks) {
-            slot.intersect_with(mask)
-        }
+        loop {
+            let mut did_something = false;
 
-        // do occurrence-based eliminations for slots with known occurrences
-        let mut slot_idxs = Vec::with_capacity(self.slots.len());
-        for (letter, &(min, _)) in self.letter_counts.iter().enumerate() {
-            slot_idxs.clear();
-            slot_idxs.extend(self.slots.iter().enumerate().filter_map(|(i, slot)| if slot.contains(letter) { Some(i) } else { None }));
-            if slot_idxs.len() > min { continue }
-
-            for &idx in slot_idxs.iter() {
-                let slot = &mut self.slots[idx];
-                slot.clear();
-                slot.insert(letter);
+            // do slot-wise letter elimination by intersect with union over valid words
+            let mut masks = vec![BitSet::new(); self.slots.len()];
+            for &word in WORD_LIST.get(&self.slots.len()).map(|x| x.as_slice()).unwrap_or(&[]) {
+                if !self.could_be(word) { continue }
+                for (mask, &ch) in iter::zip(&mut masks, word.as_bytes()) {
+                    mask.insert(ch as usize - 97);
+                }
             }
+            for (slot, mask) in iter::zip(&mut self.slots, &masks) {
+                if !slot.is_subset(mask) {
+                    slot.intersect_with(mask);
+                    did_something = true;
+                }
+            }
+
+            // do occurrence-based eliminations for slots with known occurrences
+            let mut slot_idxs = Vec::with_capacity(self.slots.len());
+            for (letter, &(min, _)) in self.letter_counts.iter().enumerate() {
+                slot_idxs.clear();
+                slot_idxs.extend(self.slots.iter().enumerate().filter_map(|(i, slot)| if slot.contains(letter) { Some(i) } else { None }));
+                if slot_idxs.len() > min { continue }
+
+                for &idx in slot_idxs.iter() {
+                    let slot = &mut self.slots[idx];
+                    if slot.len() > 1 {
+                        slot.clear();
+                        slot.insert(letter);
+                        did_something = true;
+                    }
+                }
+            }
+
+            if !did_something { return }
         }
     }
     fn guess_impl(&mut self, word: CheckedStr, response: &[Hint]) {

@@ -22,9 +22,9 @@ fn main() {
 
     puzzle.guess("cares", &[Hint::Absent, Hint::Correct, Hint::Absent, Hint::Present, Hint::Present]).unwrap();
     puzzle.guess("satay", &[Hint::Present, Hint::Correct, Hint::Absent, Hint::Absent, Hint::Absent]).unwrap();
-    puzzle.guess("bonie", &[Hint::Absent, Hint::Absent, Hint::Absent, Hint::Absent, Hint::Correct]).unwrap();
-    puzzle.guess("douse", &[Hint::Absent, Hint::Absent, Hint::Correct, Hint::Correct, Hint::Correct]).unwrap();
-    puzzle.guess("hause", &[Hint::Absent, Hint::Correct, Hint::Correct, Hint::Correct, Hint::Correct]).unwrap();
+    // puzzle.guess("bonie", &[Hint::Absent, Hint::Absent, Hint::Absent, Hint::Absent, Hint::Correct]).unwrap();
+    // puzzle.guess("douse", &[Hint::Absent, Hint::Absent, Hint::Correct, Hint::Correct, Hint::Correct]).unwrap();
+    // puzzle.guess("hause", &[Hint::Absent, Hint::Correct, Hint::Correct, Hint::Correct, Hint::Correct]).unwrap();
 
 
 
