@@ -1,6 +1,6 @@
 use std::iter::FusedIterator;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UsizeBitSet(usize);
 impl UsizeBitSet {
     pub fn new() -> Self {
@@ -26,6 +26,9 @@ impl UsizeBitSet {
     }
     pub fn intersect_with(&mut self, other: &UsizeBitSet) {
         self.0 &= other.0;
+    }
+    pub fn len(&self) -> usize {
+        self.0.count_ones() as usize
     }
 }
 
@@ -61,45 +64,53 @@ fn test_usize_bitset() {
     assert_eq!(s.into_iter().collect::<Vec<_>>(), &[]);
     assert!(!s.contains(1) && !s.contains(3) && !s.contains(0) && !s.contains(2) && !s.contains(25));
     assert!(s.is_empty());
+    assert_eq!(s.len(), 0);
 
     s.insert(0);
     assert_eq!(s.0, 0b1);
     assert_eq!(s.into_iter().collect::<Vec<_>>(), &[0]);
     assert!(!s.contains(1) && !s.contains(3) && s.contains(0) && !s.contains(2) && !s.contains(25));
     assert!(!s.is_empty());
+    assert_eq!(s.len(), 1);
 
     s.insert(3);
     assert_eq!(s.0, 0b1001);
     assert_eq!(s.into_iter().collect::<Vec<_>>(), &[0, 3]);
     assert!(!s.contains(1) && s.contains(3) && s.contains(0) && !s.contains(2) && !s.contains(25));
     assert!(!s.is_empty());
+    assert_eq!(s.len(), 2);
 
     s.insert(3);
     assert_eq!(s.0, 0b1001);
     assert_eq!(s.into_iter().collect::<Vec<_>>(), &[0, 3]);
     assert!(!s.is_empty());
+    assert_eq!(s.len(), 2);
 
     s.insert(1);
     assert_eq!(s.0, 0b1011);
     assert_eq!(s.into_iter().collect::<Vec<_>>(), &[0, 1, 3]);
     assert!(s.contains(1) && s.contains(3) && s.contains(0) && !s.contains(2) && !s.contains(25));
     assert!(!s.is_empty());
+    assert_eq!(s.len(), 3);
 
     s.remove(0);
     assert_eq!(s.0, 0b1010);
     assert_eq!(s.into_iter().collect::<Vec<_>>(), &[1, 3]);
     assert!(s.contains(1) && s.contains(3) && !s.contains(0));
     assert!(!s.is_empty());
+    assert_eq!(s.len(), 2);
 
     s.remove(0);
     assert_eq!(s.0, 0b1010);
     assert_eq!(s.into_iter().collect::<Vec<_>>(), &[1, 3]);
     assert!(!s.is_empty());
+    assert_eq!(s.len(), 2);
 
     s.remove(7);
     assert_eq!(s.0, 0b1010);
     assert_eq!(s.into_iter().collect::<Vec<_>>(), &[1, 3]);
     assert!(!s.is_empty());
+    assert_eq!(s.len(), 2);
 
     for i in 0..26 {
         s.insert(i);
@@ -107,11 +118,13 @@ fn test_usize_bitset() {
     assert_eq!(s.0, (1 << 26) - 1);
     assert_eq!(s.into_iter().collect::<Vec<_>>(), (0..26).collect::<Vec<_>>());
     assert!(!s.is_empty());
+    assert_eq!(s.len(), 26);
 
     s.clear();
     assert_eq!(s.0, 0);
     assert_eq!(s.into_iter().collect::<Vec<_>>(), &[]);
     assert!(s.is_empty());
+    assert_eq!(s.len(), 0);
 
     assert_eq!(UsizeBitSet(0b10110111001000101101001110110110).into_iter().collect::<Vec<_>>(),
         &[1, 2, 4, 5, 7, 8, 9, 12, 14, 15, 17, 21, 24, 25, 26, 28, 29, 31]);
@@ -133,4 +146,7 @@ fn test_usize_bitset() {
     assert_eq!(p.0, q.0);
     assert!(p.is_subset(&q) && q.is_subset(&p));
     assert_eq!(p.into_iter().collect::<Vec<_>>(), &[1, 4, 8, 12, 24, 25, 28, 29, 31]);
+    assert_eq!(q.into_iter().collect::<Vec<_>>(), &[1, 4, 8, 12, 24, 25, 28, 29, 31]);
+    assert_eq!(p.len(), 9);
+    assert_eq!(q.len(), 9);
 }

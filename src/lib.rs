@@ -34,7 +34,7 @@ impl<'a> CheckedStr<'a> {
 lazy_static! {
     static ref WORD_LIST: BTreeMap<usize, Vec<CheckedStr<'static>>> = {
         let mut res: BTreeMap<usize, BTreeSet<CheckedStr>> = Default::default();
-        for raw in include_str!("guess-list.txt").lines().map(str::trim).filter(|s| s.len() != 0) {
+        for raw in include_str!("guess-list.txt").lines().map(str::trim).filter(|s| !s.is_empty()) {
             let word = CheckedStr::new(raw, raw.len()).unwrap();
             res.entry(word.len()).or_default().insert(word);
         }
@@ -104,11 +104,10 @@ impl Puzzle {
 
                 for &idx in slot_idxs.iter() {
                     let slot = &mut self.slots[idx];
-                    if (*slot).into_iter().nth(1).is_some() { // len > 1
-                        slot.clear();
-                        slot.insert(letter);
-                        did_something = true;
-                    }
+                    let prev = *slot;
+                    slot.clear();
+                    slot.insert(letter);
+                    if *slot != prev { did_something = true; }
                 }
             }
 
@@ -160,8 +159,13 @@ impl Puzzle {
         if word.len() != response.len() { return Err(GuessErr::InvalidInput); }
         Ok(self.guess_impl(word, response))
     }
-    pub fn best_guess(&self, mut threads: usize) -> Result<(&'static str, usize, f64), SolveErr> {
-        if self.slots.iter().any(UsizeBitSet::is_empty) { return Err(SolveErr::Inconsistent); }
+    pub fn best_guess(&self, mut threads: usize) -> Result<(String, usize, f64), SolveErr> {
+        if self.slots.iter().any(UsizeBitSet::is_empty) {
+            return Err(SolveErr::Inconsistent);
+        }
+        if self.slots.iter().all(|s| s.len() == 1) {
+            return Ok((self.slots.iter().map(|&s| char::from_u32(s.into_iter().next().unwrap() as u32 + 97).unwrap()).collect(), 0, 0.0));
+        }
         threads = threads.max(1);
 
         let word_pool = WORD_LIST.get(&self.slots.len()).map(|x| x.as_slice()).unwrap_or(&[]);
@@ -179,12 +183,13 @@ impl Puzzle {
                     };
 
                     let mut worst: usize = 0;
-                    let mut worst_avg: (usize, usize) = (0, 1);
-                    for response in iter::once([Hint::Absent, Hint::Present, Hint::Correct]).cycle().take(this.slots.len()).multi_cartesian_product() {
+                    let mut worst_avg: (usize, usize) = (0, 0);
+                    'next_response: for response in iter::once([Hint::Absent, Hint::Present, Hint::Correct]).cycle().take(this.slots.len()).multi_cartesian_product() {
                         let mut cpy = this.clone();
                         cpy.guess_impl(guess, &response);
+                        if cpy.slots.iter().any(UsizeBitSet::is_empty) { continue 'next_response; }
                         let possible = word_pool.iter().filter(|&&s| cpy.could_be(s)).count();
-                        if possible == 0 { continue }
+                        if possible == 0 { continue 'next_response; }
 
                         worst = worst.max(possible);
                         worst_avg.0 += possible;
@@ -195,6 +200,7 @@ impl Puzzle {
                         }
                     }
                     if worst == 0 { continue 'next_word; }
+                    debug_assert_ne!(worst_avg.1, 0);
 
                     let score = (worst, FloatOrd(worst_avg.0 as f64 / worst_avg.1 as f64));
                     let replace = match best {
@@ -209,7 +215,7 @@ impl Puzzle {
 
         let best = threads.into_iter().filter_map(|t| t.join().unwrap()).min_by_key(|&(guess, score, cbf)| (score, if cbf { 0 } else { 1 }, guess));
         match best {
-            Some(x) => Ok((x.0.0, x.1.0, x.1.1.0)),
+            Some(x) => Ok((x.0.0.to_owned(), x.1.0, x.1.1.0)),
             None => Err(SolveErr::Inconsistent),
         }
     }
