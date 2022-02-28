@@ -90,10 +90,9 @@ impl Puzzle {
                 }
             }
             for (slot, mask) in iter::zip(&mut self.slots, &masks) {
-                if !slot.is_subset(mask) {
-                    slot.intersect_with(mask);
-                    did_something = true;
-                }
+                let prev = *slot;
+                slot.intersect_with(mask);
+                if *slot != prev { did_something = true; }
             }
 
             // do occurrence-based eliminations for slots with known occurrences

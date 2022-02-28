@@ -21,9 +21,6 @@ impl UsizeBitSet {
     pub fn is_empty(&self) -> bool {
         self.0 == 0
     }
-    pub fn is_subset(&self, other: &UsizeBitSet) -> bool {
-        self.0 & !other.0 == 0
-    }
     pub fn intersect_with(&mut self, other: &UsizeBitSet) {
         self.0 &= other.0;
     }
@@ -130,21 +127,14 @@ fn test_usize_bitset() {
         &[1, 2, 4, 5, 7, 8, 9, 12, 14, 15, 17, 21, 24, 25, 26, 28, 29, 31]);
 
     let mut p = UsizeBitSet(0b10110111001000101101001110110110);
-    let mut q = UsizeBitSet(0b10110111001000101101001110110110);
-    assert!(p.is_subset(&q) && q.is_subset(&p));
-    q = UsizeBitSet(0b10110111001000111101001110110110);
-    assert!(p.is_subset(&q) && !q.is_subset(&p));
-    q = UsizeBitSet(0b10110011100101010011010101010011);
-    assert!(!p.is_subset(&q) && !q.is_subset(&p));
+    let mut q = UsizeBitSet(0b10110011100101010011010101010011);
     q.intersect_with(&p);
     assert_eq!(p.0, 0b10110111001000101101001110110110);
     assert_eq!(q.0, 0b10110011000000000001000100010010);
-    assert!(!p.is_subset(&q) && q.is_subset(&p));
     p.intersect_with(&q);
     assert_eq!(p.0, 0b10110011000000000001000100010010);
     assert_eq!(q.0, 0b10110011000000000001000100010010);
     assert_eq!(p.0, q.0);
-    assert!(p.is_subset(&q) && q.is_subset(&p));
     assert_eq!(p.into_iter().collect::<Vec<_>>(), &[1, 4, 8, 12, 24, 25, 28, 29, 31]);
     assert_eq!(q.into_iter().collect::<Vec<_>>(), &[1, 4, 8, 12, 24, 25, 28, 29, 31]);
     assert_eq!(p.len(), 9);
