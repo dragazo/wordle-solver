@@ -252,7 +252,10 @@ impl<'a> Puzzle<'a> {
 
                         let mut worst: u64 = 0;
                         let mut worst_avg: (u64, u64) = (0, 0);
-                        'next_response: for response in iter::once([Hint::Absent, Hint::Present, Hint::Correct]).cycle().take(this.slots.len()).multi_cartesian_product() {
+
+                        let hint_order = [Hint::Present, Hint::Absent, Hint::Correct]; // experimentally fastest expansion order with pruning
+
+                        'next_response: for response in iter::once(hint_order).cycle().take(this.slots.len()).multi_cartesian_product() {
                             let mut cpy = this.clone();
                             cpy.guess_impl(guess, &response);
                             if cpy.slots.iter().any(BitSet32::is_empty) { continue 'next_response; }
