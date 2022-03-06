@@ -31,7 +31,9 @@ fn main() {
         inputs.push((guess, response));
     }
 
-    let mut puzzle = Puzzle::new(WORD_LEN);
+    let dictionary = Dictionary::with_words(WORD_LEN, include_str!("guess-list.txt").split_whitespace()).unwrap();
+
+    let mut puzzle = Puzzle::new(&dictionary);
     for (guess, response) in inputs.iter() {
         puzzle.guess(guess, response).unwrap();
     }

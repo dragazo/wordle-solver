@@ -14,8 +14,8 @@ name = "wordle_solver"
 path = "src/main.rs"
 
 [dependencies]
-lazy_static = "1.4.0"
 itertools = "0.10.3"
 float-ord = "0.3.2"
+crossbeam = "0.8.1"
 num_cpus = "1.13.1"
 clap = { version = "3.1.2", features = ["derive"] }

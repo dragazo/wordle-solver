@@ -1,18 +1,18 @@
 use std::iter::FusedIterator;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct UsizeBitSet(usize);
-impl UsizeBitSet {
+pub struct BitSet32(u32);
+impl BitSet32 {
     pub fn new() -> Self {
-        UsizeBitSet(0)
+        BitSet32(0)
     }
-    pub fn insert(&mut self, pos: usize) {
+    pub fn insert(&mut self, pos: u8) {
         self.0 |= 1 << pos;
     }
-    pub fn remove(&mut self, pos: usize) {
+    pub fn remove(&mut self, pos: u8) {
         self.0 &= !(1 << pos);
     }
-    pub fn contains(&self, pos: usize) -> bool {
+    pub fn contains(&self, pos: u8) -> bool {
         self.0 & (1 << pos) != 0
     }
     pub fn clear(&mut self) {
@@ -21,23 +21,23 @@ impl UsizeBitSet {
     pub fn is_empty(&self) -> bool {
         self.0 == 0
     }
-    pub fn intersect_with(&mut self, other: &UsizeBitSet) {
+    pub fn intersect_with(&mut self, other: &BitSet32) {
         self.0 &= other.0;
     }
-    pub fn len(&self) -> usize {
-        self.0.count_ones() as usize
+    pub fn len(&self) -> u32 {
+        self.0.count_ones()
     }
 }
 
 /// Iterates over the items of the bitset in ascending order.
-pub struct Iter(usize);
+pub struct Iter(u32);
 impl Iterator for Iter {
-    type Item = usize;
+    type Item = u8;
     fn next(&mut self) -> Option<Self::Item> {
         match self.0 {
             0 => None,
             v => Some({
-                let res = v.trailing_zeros() as usize;
+                let res = v.trailing_zeros() as u8;
                 self.0 &= v - 1;
                 res
             }),
@@ -46,8 +46,8 @@ impl Iterator for Iter {
 }
 impl FusedIterator for Iter {}
 
-impl IntoIterator for UsizeBitSet {
-    type Item = usize;
+impl IntoIterator for BitSet32 {
+    type Item = u8;
     type IntoIter = Iter;
     fn into_iter(self) -> Self::IntoIter {
         Iter(self.0)
@@ -55,8 +55,8 @@ impl IntoIterator for UsizeBitSet {
 }
 
 #[test]
-fn test_usize_bitset() {
-    let mut s = UsizeBitSet::new();
+fn test_bitset32() {
+    let mut s = BitSet32::new();
     assert_eq!(s.0, 0b0);
     assert_eq!(s.into_iter().collect::<Vec<_>>(), &[]);
     assert!(!s.contains(1) && !s.contains(3) && !s.contains(0) && !s.contains(2) && !s.contains(25));
@@ -123,11 +123,11 @@ fn test_usize_bitset() {
     assert!(s.is_empty());
     assert_eq!(s.len(), 0);
 
-    assert_eq!(UsizeBitSet(0b10110111001000101101001110110110).into_iter().collect::<Vec<_>>(),
+    assert_eq!(BitSet32(0b10110111001000101101001110110110).into_iter().collect::<Vec<_>>(),
         &[1, 2, 4, 5, 7, 8, 9, 12, 14, 15, 17, 21, 24, 25, 26, 28, 29, 31]);
 
-    let mut p = UsizeBitSet(0b10110111001000101101001110110110);
-    let mut q = UsizeBitSet(0b10110011100101010011010101010011);
+    let mut p = BitSet32(0b10110111001000101101001110110110);
+    let mut q = BitSet32(0b10110011100101010011010101010011);
     q.intersect_with(&p);
     assert_eq!(p.0, 0b10110111001000101101001110110110);
     assert_eq!(q.0, 0b10110011000000000001000100010010);
