@@ -95,6 +95,7 @@ pub enum Hint { Correct, Present, Absent }
 #[derive(Clone)]
 pub struct Puzzle<'a> {
     all_words: Arc<Vec<Word<'a>>>,
+    feasible_words: Arc<Vec<Word<'a>>>,
 
     slots: Vec<BitSet32>,
     letter_counts: [(usize, usize); 26],
@@ -105,14 +106,17 @@ impl<'a> Puzzle<'a> {
     /// The number of letters in the puzzle is defined by the supplied dictionary.
     pub fn new(dictionary: &'a Dictionary) -> Self {
         let all_words = Arc::new(dictionary.to_words());
+        let feasible_words = all_words.clone();
 
         let mut allowed = BitSet32::new();
         for i in 0..26 { allowed.insert(i); }
+
         let mut res = Puzzle {
-            all_words,
+            all_words, feasible_words,
             slots: vec![allowed; dictionary.word_len],
             letter_counts: [(0, dictionary.word_len); 26],
         };
+
         res.reduce();
         res
     }
@@ -136,10 +140,12 @@ impl<'a> Puzzle<'a> {
         loop {
             let mut did_something = false;
 
-            // do slot-wise letter elimination by intersect with union over valid words
+            let new_feasible: Vec<_> = self.feasible_words.iter().copied().filter(|&x| self.could_be(x)).collect();
+            self.feasible_words = Arc::new(new_feasible);
+
+            // do slot-wise letter elimination by intersect with union over feasible words
             for mask in masks.iter_mut() { mask.clear(); }
-            for &word in self.all_words.iter() {
-                if !self.could_be(word) { continue }
+            for &word in self.feasible_words.iter() {
                 for (mask, &letter) in iter::zip(&mut masks, word.iter()) {
                     mask.insert(letter);
                 }
@@ -238,7 +244,7 @@ impl<'a> Puzzle<'a> {
         threads = threads.max(1);
 
         let best = crossbeam::scope(|scope| {
-            let guesses = Arc::new(Mutex::new(self.all_words.iter().copied().fuse()));
+            let guesses = Arc::new(Mutex::new(self.all_words.iter().copied().fuse())); // a guess doesn't have to be a feasible solution
             let threads: Vec<_> = (0..threads).map(|_| {
                 let guesses = guesses.clone();
                 let this = self.clone();
@@ -258,8 +264,7 @@ impl<'a> Puzzle<'a> {
                         'next_response: for response in iter::once(hint_order).cycle().take(this.slots.len()).multi_cartesian_product() {
                             let mut cpy = this.clone();
                             cpy.guess_impl(guess, &response);
-                            if cpy.slots.iter().any(BitSet32::is_empty) { continue 'next_response; }
-                            let possible = self.all_words.iter().filter(|&&s| cpy.could_be(s)).count() as u64;
+                            let possible = cpy.feasible_words.len() as u64;
                             if possible == 0 { continue 'next_response; }
 
                             worst = worst.max(possible);
