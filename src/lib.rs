@@ -10,8 +10,22 @@ mod bit_set;
 use bit_set::BitSet32;
 
 #[derive(Debug)]
-pub enum InputError<'a> {
+pub enum GuessError<'a> {
     WrongHintLen { hint: &'a [Hint], expected_len: usize },
+    WrongWordLen { word: &'a str, expected_len: usize },
+    NotLowerAlpha { word: &'a str },
+}
+impl<'a> From<WordError<'a>> for GuessError<'a> {
+    fn from(e: WordError<'a>) -> Self {
+        match e {
+            WordError::WrongWordLen { word, expected_len } => GuessError::WrongWordLen { word, expected_len },
+            WordError::NotLowerAlpha { word } => GuessError::NotLowerAlpha { word },
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum WordError<'a> {
     WrongWordLen { word: &'a str, expected_len: usize },
     NotLowerAlpha { word: &'a str },
 }
@@ -21,12 +35,16 @@ pub enum SolveErr {
     Inconsistent
 }
 
-fn check_word(expected_len: usize, word: &str) -> Result<(), InputError> {
-    if word.len() != expected_len {
-        return Err(InputError::WrongWordLen { word, expected_len })
-    }
+macro_rules! normalized_chars {
+    ($word:expr) => { $word.as_bytes().iter().map(|&x| x - 97) }
+}
+
+fn check_word(expected_len: usize, word: &str) -> Result<(), WordError> {
     if word.chars().any(|c| !('a'..='z').contains(&c)) {
-        return Err(InputError::NotLowerAlpha { word })
+        return Err(WordError::NotLowerAlpha { word })
+    }
+    if word.len() != expected_len {
+        return Err(WordError::WrongWordLen { word, expected_len })
     }
     Ok(())
 }
@@ -41,7 +59,7 @@ impl Dictionary {
     /// Creates a new dictionary of words where each word is the specified `word_len`.
     /// If a word is invalid (incorrect length or not lowercase alphabetic), returns [`Err`].
     /// Panics if `word_len` is zero.
-    pub fn with_words<'a, T: IntoIterator<Item = &'a str>>(word_len: usize, words: T) -> Result<Self, InputError<'a>> {
+    pub fn with_words<'a, T: IntoIterator<Item = &'a str>>(word_len: usize, words: T) -> Result<Self, WordError<'a>> {
         assert!(word_len > 0);
 
         let words: BTreeSet<_> = words.into_iter().collect(); // sort and dedupe
@@ -49,7 +67,7 @@ impl Dictionary {
         let mut data = vec![];
         for word in words {
             check_word(word_len, word)?;
-            data.extend(word.as_bytes().iter().map(|&x| x - 97));
+            data.extend(normalized_chars!(word));
         }
 
         assert_eq!(data.len() % word_len, 0);
@@ -62,9 +80,9 @@ impl Dictionary {
 
 struct OwnedWord(Vec<u8>);
 impl OwnedWord {
-    fn new(expected_len: usize, word: &str) -> Result<Self, InputError> {
+    fn new(expected_len: usize, word: &str) -> Result<Self, WordError> {
         check_word(expected_len, word)?;
-        Ok(OwnedWord(word.as_bytes().iter().map(|&c| c - 97).collect()))
+        Ok(OwnedWord(normalized_chars!(word).collect()))
     }
 }
 impl OwnedWord {
@@ -88,8 +106,63 @@ impl<'a> Deref for Word<'a> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Hint { Correct, Present, Absent }
+
+/// Generate the hint that would be provided after making the given guess.
+/// Note that this requires we know the answer (e.g, for implementing a wordle game).
+pub fn get_hint<'a>(guess: &'a str, answer: &'a str) -> Result<Vec<Hint>, WordError<'a>> {
+    let len = answer.len();
+    check_word(len, answer)?;
+    check_word(len, guess)?;
+    let norm_answer = normalized_chars!(answer);
+    let norm_guess = normalized_chars!(guess);
+
+    let mut counts = [0u8; 26];
+    for ch in norm_answer.clone() {
+        counts[ch as usize] += 1;
+    }
+
+    let mut res = vec![Hint::Correct; len];
+    macro_rules! drop_count {
+        ($g:ident) => {{
+            let count = counts[$g as usize];
+            if count > 0 { counts[$g as usize] -= 1; }
+            count
+        }}
+    }
+
+    let char_pairs = iter::zip(norm_guess.clone(), norm_answer.clone());
+    for (g, a) in char_pairs.clone() {
+        if g == a { drop_count!(g); } // mark corrects first
+    }
+    for (h, (g, a)) in iter::zip(&mut res, char_pairs) {
+        if g == a { continue }
+        *h = if drop_count!(g) > 0 { Hint::Present } else { Hint::Absent }
+    }
+
+    Ok(res)
+}
+
+#[test]
+fn test_get_hint() {
+    assert_eq!(&get_hint("hello", "pogos").unwrap(), &[Hint::Absent, Hint::Absent, Hint::Absent, Hint::Absent, Hint::Present]);
+    assert_eq!(&get_hint("holop", "pogas").unwrap(), &[Hint::Absent, Hint::Correct, Hint::Absent, Hint::Absent, Hint::Present]);
+    assert_eq!(&get_hint("holop", "pooas").unwrap(), &[Hint::Absent, Hint::Correct, Hint::Absent, Hint::Present, Hint::Present]);
+    assert_eq!(&get_hint("holop", "pogos").unwrap(), &[Hint::Absent, Hint::Correct, Hint::Absent, Hint::Correct, Hint::Present]);
+    assert_eq!(&get_hint("holop", "pogao").unwrap(), &[Hint::Absent, Hint::Correct, Hint::Absent, Hint::Present, Hint::Present]);
+    assert_eq!(&get_hint("holop", "oogaa").unwrap(), &[Hint::Absent, Hint::Correct, Hint::Absent, Hint::Present, Hint::Absent]);
+
+    assert_eq!(&get_hint("pogos", "hello").unwrap(), &[Hint::Absent, Hint::Present, Hint::Absent, Hint::Absent, Hint::Absent]);
+    assert_eq!(&get_hint("pogas", "holop").unwrap(), &[Hint::Present, Hint::Correct, Hint::Absent, Hint::Absent, Hint::Absent]);
+    assert_eq!(&get_hint("pooas", "holop").unwrap(), &[Hint::Present, Hint::Correct, Hint::Present, Hint::Absent, Hint::Absent]);
+    assert_eq!(&get_hint("pogos", "holop").unwrap(), &[Hint::Present, Hint::Correct, Hint::Absent, Hint::Correct, Hint::Absent]);
+    assert_eq!(&get_hint("pogao", "holop").unwrap(), &[Hint::Present, Hint::Correct, Hint::Absent, Hint::Absent, Hint::Present]);
+    assert_eq!(&get_hint("oogaa", "holop").unwrap(), &[Hint::Present, Hint::Correct, Hint::Absent, Hint::Absent, Hint::Absent]);
+
+    assert_eq!(&get_hint("oogaa", "hloop").unwrap(), &[Hint::Present, Hint::Present, Hint::Absent, Hint::Absent, Hint::Absent]);
+    assert_eq!(&get_hint("oogaa", "hollp").unwrap(), &[Hint::Absent, Hint::Correct, Hint::Absent, Hint::Absent, Hint::Absent]);
+}
 
 /// A wordle-like puzzle.
 #[derive(Clone)]
@@ -219,9 +292,9 @@ impl<'a> Puzzle<'a> {
     /// Performs the solve state reductions corresponding to guessing the given word and receiving the supplied hint from the game.
     /// The `word` is assumed to be a valid word from the dictionary, but this is not enforced.
     /// If the `word` is invalid (not lower alphabetic or wrong length), or if the hint is the wrong length, returns [`Err`].
-    pub fn guess<'b>(&mut self, word: &'b str, hint: &'b [Hint]) -> Result<(), InputError<'b>> {
+    pub fn guess<'b>(&mut self, word: &'b str, hint: &'b [Hint]) -> Result<(), GuessError<'b>> {
         let word = OwnedWord::new(self.slots.len(), word)?;
-        if word.len() != hint.len() { return Err(InputError::WrongHintLen { hint, expected_len: self.slots.len() }); }
+        if word.len() != hint.len() { return Err(GuessError::WrongHintLen { hint, expected_len: self.slots.len() }); }
         self.guess_impl(word.as_ref(), hint);
         Ok(())
     }
