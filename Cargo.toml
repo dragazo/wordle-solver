@@ -13,6 +13,9 @@ path = "src/lib.rs"
 name = "wordle_solver"
 path = "src/main.rs"
 
+[dev-dependencies]
+proptest = "1.0.0"
+
 [dependencies]
 itertools = "0.10.3"
 float-ord = "0.3.2"

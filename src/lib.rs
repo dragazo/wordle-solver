@@ -9,6 +9,9 @@ use float_ord::FloatOrd;
 mod bit_set;
 use bit_set::BitSet32;
 
+#[cfg(test)]
+use proptest::prelude::*;
+
 #[derive(Debug)]
 pub enum GuessError<'a> {
     WrongHintLen { hint: &'a [Hint], expected_len: usize },
@@ -75,6 +78,25 @@ impl Dictionary {
     }
     fn to_words(&self) -> Vec<Word> {
         self.data.chunks_exact(self.word_len).map(Word).collect()
+    }
+}
+
+#[cfg(test)]
+proptest! {
+    #[test]
+    fn test_dict_ctor(chars in r"[a-z]*", word_len in 1usize..=16) {
+        let num_words = chars.len() / word_len;
+        let words = (0..num_words).map(|i| &chars[i*word_len..(i+1)*word_len]);
+
+        let dict = Dictionary::with_words(word_len, words.clone()).unwrap();
+        let dict_words = dict.to_words();
+        assert!(dict_words.len() <= num_words);
+
+        for word in words {
+            let clean = OwnedWord::new(word_len, word).unwrap();
+            let pos = dict_words.iter().enumerate().find(|x| x.1.0 == clean.0).unwrap().0;
+            assert!(!dict_words[pos+1..].iter().any(|x| x.0 == clean.0));
+        }
     }
 }
 
